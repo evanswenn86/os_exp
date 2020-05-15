@@ -133,8 +133,42 @@ Bash 会根据波浪号后面的用户名，返回该用户的主目录。
     $ echo Front-{A,B,C}-Back
     Front-A-Back Front-B-Back Front-C-Back
 
+注意，大括号扩展不是文件名扩展。它会扩展成所有给定的值，而不管是否有对应的文件存在。  
+逗号前面可以没有值，表示扩展的第一项为空。
 
+    $ cp a.log{,.bak}
 
+    # 等同于
+    # cp a.log a.log.bak
+
+大括号可以嵌套。
+
+    $ echo {j{p,pe}g,png}
+    jpg jpeg png
+
+    $ echo a{A{1,2},B{3,4}}b
+    aA1b aA2b aB3b aB4b
+
+    $ echo {cat,d*}
+    cat dawg dg dig dog doug dug
+
+大括号扩展的常见用途为新建一系列目录。
+
+    $ mkdir {2007..2009}-{01..12}
+
+上面命令会新建36个子目录，每个子目录的名字都是”年份-月份“。
+
+这个写法的另一个常见用途，是直接用于for循环。
+
+    for i in {1..4}
+        do
+    echo $i
+        done
+
+简写形式还可以使用第二个双点号（start..end..step），用来指定扩展的步长。
+
+    $ echo {0..8..2}
+    >> 0 2 4 6 8
 
 
 
