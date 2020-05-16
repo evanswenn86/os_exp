@@ -1267,5 +1267,626 @@ alias命令用来为一个命令指定别名，这样更便于记忆。下面是
 直接调用alias命令，可以显示所有别名。
 unalias命令可以解除别名。
 
+## 8 read命令
+read命令的格式如下。
+
+    read [-options] [variable...]
+上面语法中，options是参数选项，variable是用来保存输入数值的一个或多个变量名。如果没有提供变量名，环境变量REPLY会包含用户输入的一整行数据。
+    echo -n "输入一些文本 > "
+    read text
+    echo "你的输入：$text"
+
+    >> $ bash demo.sh
+    >> 输入一些文本 > 你好，世界
+    >> 你的输入：你好，世界
+
+read可以接受用户输入的多个值。
+
+    #!/bin/bash
+    echo Please, enter your firstname and lastname
+    read FN LN
+    echo "Hi! $LN, $FN !"
+上面例子中，read根据用户的输入，同时为两个变量赋值。
+
+如果用户的输入项少于read命令给出的变量数目，那么额外的变量值为空。如果用户的输入项多于定义的变量，那么多余的输入项会包含到最后一个变量中。
+
+如果read命令之后没有定义变量名，那么环境变量REPLY会包含所有的输入。
+
+    #!/bin/bash
+    # read-single: read multiple values into default variable
+    echo -n "Enter one or more values > "
+    read
+    echo "REPLY = '$REPLY'"
+上面脚本的运行结果如下。
+
+    $ read-single
+    Enter one or more values > a b c d
+    REPLY = 'a b c d'
+
+read 可以进行逐行读取文件：
+    while read myline
+    do
+        echo "$myline"
+    done < $filename
+
+相关参数：
+1）-t 参数
+
+read命令的-t参数，设置了超时的秒数。如果超过了指定时间，用户仍然没有输入，脚本将放弃等待，继续向下执行。
+
+    #!/bin/bash
+
+    echo -n "输入一些文本 > "
+    if read -t 3 response; then
+      echo "用户已经输入了"
+    else
+      echo "用户没有输入"
+    fi
+上面例子中，输入命令会等待3秒，如果用户超过这个时间没有输入，这个命令就会执行失败。if根据命令的返回值，转入else代码块，继续往下执行。
+
+环境变量TMOUT也可以起到同样作用，指定read命令等待用户输入的时间（单位为秒）。
+
+    $ TMOUT=3
+    $ read response
+上面例子也是等待3秒，如果用户还没有输入，就会超时。
+
+（2）-p 参数
+
+-p参数指定用户输入的提示信息。
+
+    read -p "Enter one or more values > "
+    echo "REPLY = '$REPLY'"
+上面例子中，先显示Enter one or more values >，再接受用户的输入。
+
+（3）-a 参数
+
+-a参数把用户的输入赋值给一个数组，从零号位置开始。
+
+    $ read -a people
+    alice duchess dodo
+    $ echo ${people[2]}
+    dodo
+上面例子中，用户输入被赋值给一个数组people，这个数组的2号成员就是dodo。
+
+（4）-n 参数
+
+-n参数指定只读取若干个字符作为变量值，而不是整行读取。
+
+    $ read -n 3 letter
+    abcdefghij
+    $ echo $letter
+    abc
+上面例子中，变量letter只包含3个字母。
+
+（5）-e 参数
+
+-e参数允许用户输入的时候，使用readline库提供的快捷键，比如自动补全。具体的快捷键可以参阅《行操作》一章。
+
+    #!/bin/bash
+
+    echo Please input the path to the file:
+
+    read -e fileName
+
+    echo $fileName
+上面例子中，read命令接受用户输入的文件名。这时，用户可能想使用 Tab 键的文件名“自动补全”功能，但是read命令的输入默认不支持readline库的功能。-e参数就可以允许用户使用自动补全。
+
+（6）其他参数
+
+-d delimiter：定义字符串delimiter的第一个字符作为用户输入的结束，而不是一个换行符。
+
+-r：raw 模式，表示不把用户输入的反斜杠字符解释为转义字符。
+
+-s：使得用户的输入不显示在屏幕上，这常常用于输入密码或保密信息。
+
+-u fd：使用文件描述符fd作为输入。
+
+## 9 条件判断
+### 9.1 if语句
+基本结构如下：
+
+    if commands; then
+      commands
+    [elif commands; then
+      commands...]
+    [else
+      commands]
+    fi
+下面的例子中，判断条件是环境变量$USER是否等于foo，如果等于就输出Hello foo.，否则输出其他内容。
+
+    if test $USER = "foo"; then
+      echo "Hello foo."
+    else
+      echo "You are not foo."
+    fi
+if和then写在同一行时，需要分号分隔。分号是 Bash 的命令分隔符。它们也可以写成两行，这时不需要分号。
+
+除了多行的写法，if结构也可以写成单行。
+
+    $ if true; then echo 'hello world'; fi
+    hello world
+
+    $ if false; then echo "It's true."; fi
+
+if后面可以跟任意数量的命令。这时，所有命令都会执行，但是判断真伪只看最后一个命令，即使前面所有命令都失败，只要最后一个命令返回0，就会执行then的部分。
+
+    $ if false; true; then echo 'hello world'; fi
+    hello world
+
+### 9.2 test
+
+if结构的判断条件，一般使用test命令，有三种形式。
+
+    # 写法一
+    test expression
+
+    # 写法二
+    [ expression ]
+
+    # 写法三
+    [[ expression ]]
+
+上面的expression是一个表达式。这个表达式为真，test命令执行成功（返回值为0）；表达式为伪，test命令执行失败（返回值为1）。注意，第二种和第三种写法，[ 和 ]与内部的表达式之间必须有空格。
+
+    $ test -f /etc/hosts
+    $ echo $?
+    0
+
+    $ [ -f /etc/hosts ]
+    $  echo $?
+    0
+上面的例子中，test命令采用两种写法，判断/etc/hosts文件是否存在，这两种写法是等价的
+
+test 在 if 中的使用示例
+
+    # 写法一
+    if test -e /tmp/foo.txt ; then
+      echo "Found foo.txt"
+    fi
+
+    # 写法二
+    if [ -e /tmp/foo.txt ] ; then
+      echo "Found foo.txt"
+    fi
+
+    # 写法三
+    if [[ -e /tmp/foo.txt ]] ; then
+      echo "Found foo.txt"
+    fi
+
+### 9.3 判断表达式
+#### 9.3.1 文件判断
+[ -a file ]：如果 file 存在，则为true。  
+[ -b file ]：如果 file 存在并且是一个块（设备）文件，则为true。  
+[ -c file ]：如果 file 存在并且是一个字符（设备）文件，则为true。  
+[ -d file ]：如果 file 存在并且是一个目录，则为true。  
+[ -e file ]：如果 file 存在，则为true。  
+[ -f file ]：如果 file 存在并且是一个普通文件，则为true。  
+[ -g file ]：如果 file 存在并且设置了组 ID，则为true。  
+[ -G file ]：如果 file 存在并且属于有效的组 ID，则为true。  
+[ -h file ]：如果 file 存在并且是符号链接，则为true。  
+[ -k file ]：如果 file 存在并且设置了它的“sticky bit”，则为true。  
+[ -L file ]：如果 file 存在并且是一个符号链接，则为true。  
+[ -N file ]：如果 file 存在并且自上次读取后已被修改，则为true。  
+[ -O file ]：如果 file 存在并且属于有效的用户 ID，则为true。  
+[ -p file ]：如果 file 存在并且是一个命名管道，则为true。  
+[ -r file ]：如果 file 存在并且可读（当前用户有可读权限），则为true。  
+[ -s file ]：如果 file 存在且其长度大于零，则为true。  
+[ -S file ]：如果 file 存在且是一个网络 socket，则为true。  
+[ -t fd ]：如果 fd 是一个文件描述符，并且重定向到终端，则为true。 这可以用来判断是否重定向了标准输入／输出错误。  
+[ -u file ]：如果 file 存在并且设置了 setuid 位，则为true。  
+[ -w file ]：如果 file 存在并且可写（当前用户拥有可写权限），则为true。  
+[ -x file ]：如果 file 存在并且可执行（有效用户有执行／搜索权限），则为true。  
+[ file1 -nt file2 ]：如果 FILE1 比 FILE2 的更新时间最近，或者 FILE1 存在而 FILE2 不存在，则为true。  
+[ file1 -ot file2 ]：如果 FILE1 比 FILE2 的更新时间更旧，或者 FILE2 存在而 FILE1 不存在，则为true。  
+[ FILE1 -ef FILE2 ]：如果 FILE1 和 FILE2 引用相同的设备和 inode 编号，则为true。  
+
+#### 9.3.2 字符串判断
+[ string ]：如果string不为空（长度大于0），则判断为真。  
+[ -n string ]：如果字符串string的长度大于零，则判断为真。  
+[ -z string ]：如果字符串string的长度为零，则判断为真。  
+[ string1 = string2 ]：如果string1和string2相同，则判断为真。  
+[ string1 == string2 ] 等同于[ string1 = string2 ]。  
+[ string1 != string2 ]：如果string1和string2不相同，则判断为真。  
+[ string1 '>' string2 ]：如果按照字典顺序string1排列在string2之后，则判断为真。  
+[ string1 '<' string2 ]：如果按照字典顺序string1排列在string2之前，则判断为真。  
+
+#### 9.3.3 整数判断
+[ integer1 -eq integer2 ]：如果integer1等于integer2，则为true。  
+[ integer1 -ne integer2 ]：如果integer1不等于integer2，则为true。  
+[ integer1 -le integer2 ]：如果integer1小于或等于integer2，则为true。  
+[ integer1 -lt integer2 ]：如果integer1小于integer2，则为true。  
+[ integer1 -ge integer2 ]：如果integer1大于或等于integer2，则为true。  
+[ integer1 -gt integer2 ]：如果integer1大于integer2，则为true。  
+
+#### 9.3.4 正则表达式判断
+[[ expression ]]这种判断形式，支持正则表达式。  
+[[ string1 =~ regex ]]
+上面的语法中，regex是一个正则表示式，=~是正则比较运算符。
+
+下面是一个例子。
+
+    #!/bin/bash
+
+    INT=-5
+
+    if [[ "$INT" =~ ^-?[0-9]+$ ]]; then
+      echo "INT is an integer."
+      exit 0
+    else
+      echo "INT is not an integer." >&2
+      exit 1
+    fi
+上面代码中，先判断变量INT的字符串形式，是否满足^-?[0-9]+$的正则模式，如果满足就表明它是一个整数。
+
+#### 9.3.5 test判断
+通过逻辑运算，可以把多个test判断表达式结合起来，创造更复杂的判断。三种逻辑运算AND，OR，和NOT，都有自己的专用符号。
+
+AND运算：符号&&，也可使用参数-a。  
+OR运算：符号||，也可使用参数-o。  
+NOT运算：符号!。  
+
+下面是一个AND的例子，判断整数是否在某个范围之内。
+
+    #!/bin/bash
+
+    MIN_VAL=1
+    MAX_VAL=100
+
+    INT=50
+
+    if [[ "$INT" =~ ^-?[0-9]+$ ]]; then
+      if [[ $INT -ge $MIN_VAL && $INT -le $MAX_VAL ]]; then
+        echo "$INT is within $MIN_VAL to $MAX_VAL."
+      else
+        echo "$INT is out of range."
+      fi
+    else
+      echo "INT is not an integer." >&2
+      exit 1
+    fi
+
+### 9.4 case结构
+
+    case expression in
+      pattern )
+        commands ;;
+      pattern )
+        commands ;;
+      ...
+    esac
+上面是标准的模板
+
+    echo -n "输入一个1到3之间的数字（包含两端）> "
+    read character
+    case $character in
+      1 ) echo 1
+        ;;
+      2 ) echo 2
+        ;;
+      3 ) echo 3
+        ;;
+      * ) echo 输入不符合要求
+    esac
+上面例子中，最后一条匹配语句的模式是*，这个通配符可以匹配其他字符和没有输入字符的情况，类似if的else部分。
+
+下面是另一个例子。
+
+    OS=$(uname -s)
+
+    case "$OS" in
+      FreeBSD) echo "This is FreeBSD" ;;
+      Darwin) echo "This is Mac OSX" ;;
+      AIX) echo "This is AIX" ;;
+      Minix) echo "This is Minix" ;;
+      Linux) echo "This is Linux" ;;
+      *) echo "Failed to identify this OS" ;;
+    esac
+
+在不同pattern中我们可以使用各种通配符，比如：
++ a)：匹配a。
++ a|b)：匹配a或b。
++ [[:alpha:]])：匹配单个字母。
++ ???)：匹配3个字符的单词。
++ *.txt)：匹配.txt结尾。
++ *)：匹配任意输入，通过作为case结构的最后一个模式。
+
+且当下bash版本可以匹配多个条件：
+
+    #!/bin/bash
+    # test.sh
+
+    read -n 1 -p "Type a character > "
+    echo
+    case $REPLY in
+      [[:upper:]])    echo "'$REPLY' is upper case." ;;&
+      [[:lower:]])    echo "'$REPLY' is lower case." ;;&
+      [[:alpha:]])    echo "'$REPLY' is alphabetic." ;;&
+      [[:digit:]])    echo "'$REPLY' is a digit." ;;&
+      [[:graph:]])    echo "'$REPLY' is a visible character." ;;&
+      [[:punct:]])    echo "'$REPLY' is a punctuation symbol." ;;&
+      [[:space:]])    echo "'$REPLY' is a whitespace character." ;;&
+      [[:xdigit:]])   echo "'$REPLY' is a hexadecimal digit." ;;&
+    esac
+
+## 10 循环
+### 10.1 while
+    while condition; do
+        commands
+    done
+只要满足条件condition，就会执行命令commands。然后，再次判断是否满足条件condition，只要满足，就会一直执行下去。只有不满足条件，才会退出循环。
+
+循环条件condition可以使用test命令，跟if结构的判断条件写法一致。
+
+    number=0
+    while [ "$number" -lt 10 ]; do
+      echo "Number = $number"
+      number=$((number + 1))
+    done
+
+关键字do可以跟while不在同一行，这时两者之间不需要使用分号分隔。
+
+    while true
+    do
+      echo 'Hi, while looping ...';
+    done
+上面的例子会无限循环，可以按下 Ctrl + c 停止。
+
+while循环写成一行，也是可以的。
+
+    $ while true; do echo 'Hi, while looping ...'; done
+
+### 10.2 until
+until循环与while循环恰好相反，只要不符合判断条件（判断条件失败），就不断循环执行指定的语句。一旦符合判断条件，就退出循环。
+
+    until condition; do
+      commands
+    done
+
+    $ until false; do echo 'Hi, until looping ...'; done
+    Hi, until looping ...
+    Hi, until looping ...
+    Hi, until looping ...
+    ^C
+上面代码中，until的部分一直为false，导致命令无限运行，必须按下 Ctrl + c 终止。
+
+until的条件部分也可以是一个命令，表示在这个命令执行成功之前，不断重复尝试。
+
+    until cp $1 $2; do
+      echo 'Attempt to copy failed. waiting...'
+      sleep 5
+    done
+上面例子表示，只要cp $1 $2这个命令执行不成功，就5秒钟后再尝试一次，直到成功为止。
+
+### 10.3 for in
+for...in循环用于遍历列表的每一项。
+
+    for variable in list
+    do
+      commands
+    done
+上面语法中，for循环会依次从list列表中取出一项，作为变量variable，然后在循环体中进行处理。
+
+列表可以由通配符产生。
+
+    for i in *.png; do
+      ls -l $i
+    done
+上面例子中，*.png会替换成当前目录中所有 PNG 图片文件，变量i会依次等于每一个文件。
+
+列表也可以通过子命令产生。
+
+    #!/bin/bash
+
+    count=0
+    for i in $(cat ~/.bash_profile); do
+      count=$((count + 1))
+      echo "Word $count ($i) contains $(echo -n $i | wc -c) characters"
+    done
+上面例子中，cat ~/.bash_profile命令会输出~/.bash_profile文件的内容，然后通过遍历每一个词，计算该文件一共包含多少个词，以及每个词有多少个字符。
+
+### 10.4 for
+
+for循环还支持 C 语言的循环语法。
+
+    for (( expression1; expression2; expression3 )); do
+      commands
+    done
+上面代码中，expression1用来初始化循环条件，expression2用来决定循环结束的条件，expression3在每次循环迭代的末尾执行，用于更新值。
+
+注意，循环条件放在双重圆括号之中。另外，圆括号之中使用变量，不必加上美元符号$。
+    for (( i=0; i<5; i=i+1 )); do
+      echo $i
+    done
+
+### 10.5 break & continue
+Bash 提供了两个内部命令break和continue，用来在循环内部跳出循环。
+
+break命令立即终止循环，程序继续执行循环块之后的语句，即不再执行剩下的循环。
+
+    #!/bin/bash
+
+    for number in 1 2 3 4 5 6
+    do
+      echo "number is $number"
+      if [ "$number" = "3" ]; then
+        break
+      fi
+    done
+上面例子只会打印3行结果。一旦变量$number等于3，就会跳出循环，不再继续执行。
+
+continue命令立即终止本轮循环，开始执行下一轮循环。
+
+    #!/bin/bash
+
+    while read -p "What file do you want to test?" filename
+    do
+      if [ ! -e "$filename" ]; then
+        echo "The file does not exist."
+        continue
+      fi
+
+      echo "You entered a valid file.."
+    done
+上面例子中，只要用户输入的文件不存在，continue命令就会生效，直接进入下一轮循环（让用户重新输入文件名），不再执行后面的打印语句。
+
+## 11 函数
+### 11.1 定义
+Bash 函数定义的语法有两种。
+
+    # 第一种
+    fn() {
+      # codes
+    }
+
+    # 第二种
+    function fn() {
+      # codes
+    }
+下面是一个多行函数的例子，显示当前日期时间。
+
+    today() {
+      echo -n "Today's date is: "
+      date +"%A, %B %-d, %Y"
+    }
+
+删除一个函数，可以使用unset命令。
+
+    unset -f functionName
+
+查看当前 Shell 已经定义的所有函数，可以使用declare命令。
+
+    $ declare -f
+上面的declare命令不仅会输出函数名，还会输出所有定义。输出顺序是按照函数名的字母表顺序。由于会输出很多内容，最好通过管道命令配合more或less使用。
+
+declare命令还支持查看单个函数的定义。
+
+    $ declare -f functionName
+declare -F可以输出所有已经定义的函数名，不含函数体。
+
+    $ declare -F
+
+### 11.2 变量
+函数体内可以使用参数变量，获取函数参数。函数的参数变量，与脚本参数变量是一致的。
+
+$1~$9：函数的第一个到第9个的参数。  
+$0：函数所在的脚本名。  
+$#：函数的参数总数。  
+$@：函数的全部参数，参数之间使用空格分隔。  
+$*：函数的全部参数，参数之间使用变量$IFS值的第一个字符分隔，默认为空格，但是可以自定义。  
+如果函数的参数多于9个，那么第10个参数可以用${10}的形式引用，以此类推。  
+
+下面是一个示例脚本test.sh。
+
+    #!/bin/bash
+    # test.sh
+
+    function alice {
+      echo "alice: $@"
+      echo "$0: $1 $2 $3 $4"
+      echo "$# arguments"
+
+    }
+
+    alice in wonderland
+
+运行该脚本，结果如下。
+
+    $ bash test.sh
+    alice: in wonderland
+    test.sh: in wonderland
+    2 arguments
+上面例子中，由于函数alice只有第一个和第二个参数，所以第三个和第四个参数为空。
+
+### 11.3 return
+
+return命令用于从函数返回一个值。函数执行到这条命令，就不再往下执行了，直接返回了。
+
+    function func_return_value {
+      return 10
+    }
+函数将返回值返回给调用者。如果命令行直接执行函数，下一个命令可以用$?拿到返回值。
+
+    $ func_return_value
+    $ echo "Value returned by function is: $?"
+    Value returned by function is: 10
+
+### 11.4 全局和局部变量，local命令
+Bash 函数体内直接声明的变量，属于全局变量，整个脚本都可以读取。这一点需要特别小心。
+
+    # 脚本 test.sh
+    fn () {
+      foo=1
+      echo "fn: foo = $foo"
+    }
+
+    fn
+    echo "global: foo = $foo"
+    上面脚本的运行结果如下。
+
+    $ bash test.sh
+    fn: foo = 1
+    global: foo = 1
+上面例子中，变量$foo是在函数fn内部声明的，函数体外也可以读取。
+
+## 12 数组
+
+## 13 set命令
+
+## 14 脚本除错
+
+## 15 mktemp & trap
+
+## 16 启动环境
+### 16.1 session
+用户每次使用 Shell，都会开启一个与 Shell 的 Session（对话）。
+
+Session 有两种类型：登录 Session 和非登录 Session，也可以叫做 login shell 和 non-login shell。
+
+登录 Session 一般进行整个系统环境的初始化，启动的初始化脚本依次如下。  
++ /etc/profile：所有用户的全局配置脚本。  
++ /etc/profile.d目录里面所有.sh文件  
++ ~/.bash_profile：用户的个人配置脚本。如果该脚本存在，则执行完就不再往下执行。  
++ ~/.bash_login：如果~/.bash_profile没找到，则尝试执行这个脚本（C shell 的初始化脚本）。如果该脚本存在，则执行完就不再往下执行。  
++ ~/.profile：如果~/.bash_profile和~/.bash_login都没找到，则尝试读取这个脚本（Bourne shell 和 Korn shell 的初始化脚本）。  
+
+Linux 发行版更新的时候，会更新/etc里面的文件，比如/etc/profile，因此不要直接修改这个文件。如果想修改所有用户的登陆环境，就在/etc/profile.d目录里面新建.sh脚本
+
+bash命令的--login参数，会强制执行登录 Session 会执行的脚本。
+
+    $ bash --login
+bash命令的--noprofile参数，会跳过上面这些 Profile 脚本。
+
+    $ bash --noprofile
+
+
+非登录 Session 是用户进入系统以后，手动新建的 Session，这时不会进行环境初始化。比如，在命令行执行bash命令，就会新建一个非登录 Session。
+
+非登录 Session 的初始化脚本依次如下。
+
++ /etc/bash.bashrc：对全体用户有效。
++ ~/.bashrc：仅对当前用户有效。
+对用户来说，~/.bashrc通常是最重要的脚本。非登录 Session 默认会执行它，而登陆 Session 一般也会通过调用执行它。由于每次执行 Bash 脚本，都会新建一个非登录 Session，所以~/.bashrc也是每次执行脚本都会执行的。
+
+bash命令的--norc参数，可以禁止在非登录 Session 执行~/.bashrc脚本。
+
+    $ bash --norc
+bash命令的--rcfile参数，指定另一个脚本代替.bashrc。
+
+    $ bash --rcfile testrc
+
+### 16.2 启动选项
+为了方便 Debug，有时在启动 Bash 的时候，可以加上启动参数。
+
++ -n：不运行脚本，只检查是否有语法错误。
++ -v：输出每一行语句运行结果前，会先输出该行语句。
++ -x：每一个命令处理完以后，先输出该命令，再进行下一个命令的处理。  
+例子如下：
+
+    $ bash -n scriptname
+    $ bash -v scriptname
+    $ bash -x scriptname
+
+
 
 
