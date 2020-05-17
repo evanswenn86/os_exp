@@ -1830,12 +1830,557 @@ Bash 函数体内直接声明的变量，属于全局变量，整个脚本都可
 上面例子中，变量$foo是在函数fn内部声明的，函数体外也可以读取。
 
 ## 12 数组
+### 12.1 基本操作
+数组可以采用逐个赋值的方法创建。
+
+    ARRAY[INDEX]=value
+上面语法中，ARRAY是数组的名字，可以是任意合法的变量名。INDEX是一个大于或等于零的整数，也可以是算术表达式。注意数组第一个元素的下标是0， 而不是1。
+
+下面创建一个三个成员的数组。
+
+    $ array[0]=val
+    $ array[1]=val
+    $ array[2]=val
+数组也可以采用一次性赋值的方式创建。
+
+    ARRAY=(value1 value2 ... valueN)
+
+    # 等同于
+
+    ARRAY=(
+      value1
+      value2
+      value3
+    )
+采用上面方式创建数组时，可以按照默认顺序赋值，也可以在每个值前面指定位置。
+
+    $ array=(a b c)
+    $ array=([2]=c [0]=a [1]=b)
+
+    $ days=(Sun Mon Tue Wed Thu Fri Sat)
+    $ days=([0]=Sun [1]=Mon [2]=Tue [3]=Wed [4]=Thu [5]=Fri [6]=Sat)
+只为某些值指定位置，也是可以的。
+
+    names=(hatter [5]=duchess alice)
+上面例子中，hatter是数组的0号位置，duchess是5号位置，alice是6号位置。
+
+没有赋值的数组元素的默认值是空字符串。
+
+定义数组的时候，可以使用通配符。
+
+    $ mp3s=( *.mp3 )
+上面例子中，将当前目录的所有 MP3 文件，放进一个数组。
+
+先用declare -a命令声明一个数组，也是可以的。
+
+    $ declare -a ARRAYNAME
+read -a命令则是将用户的命令行输入，读入一个数组。
+
+    $ read -a dice
+上面命令将用户的命令行输入，读入数组dice。
+
+
+
+
+读取数组指定位置的成员，要使用下面的语法。
+
+    $ echo ${array[i]}     # i 是索引
+上面语法里面的大括号是必不可少的，否则 Bash 会把索引部分[i]按照原样输出。
+
+    $ array[0]=a
+
+    $ echo ${array[0]}
+    a
+
+    $ echo $array[0]
+    a[0]
+上面例子中，数组的第一个元素是a。如果不加大括号，Bash 会直接读取$array首成员的值，然后将[0]按照原样输出。
+
+
+@和*是数组的特殊索引，表示返回数组的所有成员。
+
+    $ foo=(a b c d e f)
+    $ echo ${foo[@]}
+    a b c d e f
+这两个特殊索引配合for循环，就可以用来遍历数组。
+
+    for i in "${names[@]}"; do
+      echo $i
+    done
+@和*放不放在双引号之中，是有差别的。
+
+    $ activities=( swimming "water skiing" canoeing "white-water rafting" surfing )
+    $ for act in ${activities[@]}; \
+    do \
+    echo "Activity: $act"; \
+    done
+
+    Activity: swimming
+    Activity: water
+    Activity: skiing
+    Activity: canoeing
+    Activity: white-water
+    Activity: rafting
+    Activity: surfing
+上面的例子中，数组activities实际包含5个元素，但是for...in循环直接遍历${activities[@]}，会导致返回7个结果。为了避免这种情况，一般把${activities[@]}放在双引号之中。
+
+    $ for act in "${activities[@]}"; \
+    do \
+    echo "Activity: $act"; \
+    done
+
+    Activity: swimming
+    Activity: water skiing
+    Activity: canoeing
+    Activity: white-water rafting
+    Activity: surfing
+上面例子中，${activities[@]}放在双引号之中，遍历就会返回正确的结果。
+
+    ${activities[*]}不放在双引号之中，跟${activities[@]}不放在双引号之中是一样的。
+
+    $ for act in ${activities[*]}; \
+    do \
+    echo "Activity: $act"; \
+    done
+
+    Activity: swimming
+    Activity: water
+    Activity: skiing
+    Activity: canoeing
+    Activity: white-water
+    Activity: rafting
+    Activity: surfing
+${activities[*]}放在双引号之中，所有元素就会变成单个字符串返回。
+
+    $ for act in "${activities[*]}"; \
+    do \
+    echo "Activity: $act"; \
+    done
+
+    Activity: swimming water skiing canoeing white-water rafting surfing
+所以，拷贝一个数组的最方便方法，就是写成下面这样。
+
+    $ hobbies=( "${activities[@]}" )
+上面例子中，数组activities被拷贝给了另一个数组hobbies。
+
+这种写法也可以用来为新数组添加成员。
+
+    $ hobbies=( "${activities[@]" diving )
+上面例子中，新数组hobbies在数组activities的所有成员之后，又添加了一个成员。
+
+### 12.2 数组长度
+要想知道数组的长度（即一共包含多少成员），可以使用下面两种语法。
+
+    ${#array[*]}
+    ${#array[@]}
+下面是一个例子。
+
+    $ a[100]=foo
+
+    $ echo ${#a[*]}
+    1
+
+    $ echo ${#a[@]}
+    1
+上面例子中，把字符串赋值给100位置的数组元素，这时的数组只有一个元素。
+
+注意，如果用这种语法去读取具体的数组成员，就会返回该成员的字符串长度。这一点必须小心。
+
+    $ a[100]=foo
+    $ echo ${#a[100]}
+    3
+上面例子中，${#a[100]}实际上是返回数组第100号成员a[100]的值（foo）的字符串长度。
+
+### 12.3 序号
+${!array[@]}或${!array[*]}，可以返回数组的成员序号，即哪些位置是有值的。
+
+    $ arr=([5]=a [9]=b [23]=c)
+    $ echo ${!arr[@]}
+    5 9 23
+    $ echo ${!arr[*]}
+    5 9 23
+上面例子中，数组的5、9、23号位置有值。
+
+利用这个语法，也可以通过for循环遍历数组。
+
+    arr=(a b c d)
+
+    for i in ${!arr[@]};do
+      echo ${arr[i]}
+    done
+
+### 12.4 提取成员
+${array[@]:position:length}的语法可以提取数组成员。
+
+    $ food=( apples bananas cucumbers dates eggs fajitas grapes )
+    $ echo ${food[@]:1:1}
+    bananas
+    $ echo ${food[@]:1:3}
+    bananas cucumbers dates
+上面例子中，${food[@]:1:1}返回从数组1号位置开始的1个成员，${food[@]:1:3}返回从1号位置开始的3个成员。
+
+如果省略长度参数length，则返回从指定位置开始的所有成员。
+
+    $ echo ${food[@]:4}
+    eggs fajitas grapes
+上面例子返回从4号位置开始到结束的所有成员。
+
+### 12.5 添加操作
+数组末尾追加成员，可以使用+=赋值运算符。它能够自动地把值追加到数组末尾。否则，就需要知道数组的最大序号，比较麻烦。
+
+    $ foo=(a b c)
+    $ echo ${foo[@]}
+    a b c
+
+    $ foo+=(d e f)
+    $ echo ${foo[@]}
+    a b c d e f
+
+### 12.6 删除操作
+删除一个数组成员，使用unset命令。
+
+    $ foo=(a b c d e f)
+    $ echo ${foo[@]}
+    a b c d e f
+
+    $ unset foo[2]
+    $ echo ${foo[@]}
+    a b d e f
+上面例子中，删除了数组中的第三个元素，下标为2。
+
+删除成员也可以将这个成员设为空值。
+
+    $ foo=(a b c d e f)
+    $ foo[1]=''
+    $ echo ${foo[@]}
+    a c d e f
+上面例子中，将数组的第二个成员设为空字符串，就删除了这个成员。
+
+由于空值就是空字符串，所以下面这样写也可以，但是不建议这种写法。
+
+    $ foo[1]=
+上面的写法也相当于删除了数组的第二个成员。
+
+直接将数组变量赋值为空字符串，相当于删除数组的第一个成员。
+
+    $ foo=(a b c d e f)
+    $ foo=''
+    $ echo ${foo[@]}
+    b c d e f
+上面的写法相当于删除了数组的第一个成员。
+
+unset ArrayName可以清空整个数组。
+
+    $ unset ARRAY
+
+    $ echo ${ARRAY[*]}
+    <--no output-->
 
 ## 13 set命令
-
+见 https://wangdoc.com/bash/set.html
 ## 14 脚本除错
+### 14.1 常见错误
+编写 Shell 脚本的时候，一定要考虑到命令失败的情况，否则很容易出错。
+
+    #! /bin/bash
+
+    dir_name=/path/not/exist
+
+    cd $dir_name
+    rm *
+上面脚本中，如果目录$dir_name不存在，cd $dir_name命令就会执行失败。这时，就不会改变当前目录，脚本会继续执行下去，导致rm *命令删光当前目录的文件。
+
+如果改成下面的样子，也会有问题。
+
+    cd $dir_name && rm *
+上面脚本中，只有cd $dir_name执行成功，才会执行rm *。但是，如果变量$dir_name为空，cd就会进入用户主目录，从而删光用户主目录的文件。
+
+下面的写法才是正确的。
+
+    [[ -d $dir_name ]] && cd $dir_name && rm *
+上面代码中，先判断目录$dir_name是否存在，然后才执行其他操作。
+
+如果不放心删除什么文件，可以先打印出来看一下。
+
+    [[ -d $dir_name ]] && cd $dir_name && echo rm *
+上面命令中，echo rm *不会删除文件，只会打印出来要删除的文件。
+
+### 14.2 bash的-x参数
+bash的-x参数可以在执行每一行命令之前，打印该命令。这样就不用自己输出执行的命令，一旦出错，比较容易追查。
+
+下面是一个脚本script.sh。
+
+    # script.sh
+    echo hello world
+加上-x参数，执行每条命令之前，都会显示该命令。
+
+    $ bash -x script.sh
+    + echo hello world
+    hello world
+上面例子中，行首为+的行，显示该行是所要执行的命令，下一行才是该命令的执行结果。
+
+下面再看一个-x写在脚本内部的例子。
+
+    #! /bin/bash -x
+    # trouble: script to demonstrate common errors
+
+    number=1
+    if [ $number = 1 ]; then
+      echo "Number is equal to 1."
+    else
+      echo "Number is not equal to 1."
+    fi
+上面的脚本执行之后，会输出每一行命令。
+
+    $ trouble
+    + number=1
+    + '[' 1 = 1 ']'
+    + echo 'Number is equal to 1.'
+    Number is equal to 1.
+输出的命令之前的+号，是由系统变量PS4决定，可以修改这个变量。
+
+    $ export PS4='$LINENO + '
+    $ trouble
+    5 + number=1
+    7 + '[' 1 = 1 ']'
+    8 + echo 'Number is equal to 1.'
+    Number is equal to 1.
+另外，set命令也可以设置 Shell 的行为参数，有利于脚本除错，详见《set 命令》一章。
+
+### 14.3 可以使用的环境变量
+#### 14.3.1 lineno
+变量LINENO返回它在脚本里面的行号。
+
+    #!/bin/bash
+
+echo "This is line $LINENO"
+执行上面的脚本test.sh，$LINENO会返回3。
+
+    $ ./test.sh
+    This is line 3
+
+#### 14.3.2 FUNCNAME
+
+变量FUNCNAME返回一个数组，内容是当前的函数调用堆栈。该数组的0号成员是当前调用的函数，1号成员是调用当前函数的函数，以此类推。
+
+    #!/bin/bash
+
+    function func1()
+    {
+      echo "func1: FUNCNAME0 is ${FUNCNAME[0]}"
+      echo "func1: FUNCNAME1 is ${FUNCNAME[1]}"
+      echo "func1: FUNCNAME2 is ${FUNCNAME[2]}"
+      func2
+    }
+
+    function func2()
+    {
+      echo "func2: FUNCNAME0 is ${FUNCNAME[0]}"
+      echo "func2: FUNCNAME1 is ${FUNCNAME[1]}"
+      echo "func2: FUNCNAME2 is ${FUNCNAME[2]}"
+    }
+
+    func1
+执行上面的脚本test.sh，结果如下。
+
+    $ ./test.sh
+    func1: FUNCNAME0 is func1
+    func1: FUNCNAME1 is main
+    func1: FUNCNAME2 is
+    func2: FUNCNAME0 is func2
+    func2: FUNCNAME1 is func1
+    func2: FUNCNAME2 is main
+上面例子中，执行func1时，变量FUNCNAME的0号成员是func1，1号成员是调用func1的主脚本main。执行func2时，变量FUNCNAME的0号成员是func2，1号成员是调用func2的func1。
+
+#### 14.3.3 BASH_SOURCE
+变量BASH_SOURCE返回一个数组，内容是当前的脚本调用堆栈。该数组的0号成员是当前执行的脚本，1号成员是调用当前脚本的脚本，以此类推，跟变量FUNCNAME是一一对应关系。
+
+下面有两个子脚本lib1.sh和lib2.sh。
+
+    # lib1.sh
+    function func1()
+    {
+      echo "func1: BASH_SOURCE0 is ${BASH_SOURCE[0]}"
+      echo "func1: BASH_SOURCE1 is ${BASH_SOURCE[1]}"
+      echo "func1: BASH_SOURCE2 is ${BASH_SOURCE[2]}"
+      func2
+    }
+    # lib2.sh
+    function func2()
+    {
+      echo "func2: BASH_SOURCE0 is ${BASH_SOURCE[0]}"
+      echo "func2: BASH_SOURCE1 is ${BASH_SOURCE[1]}"
+      echo "func2: BASH_SOURCE2 is ${BASH_SOURCE[2]}"
+    }
+然后，主脚本main.sh调用上面两个子脚本。
+
+    #!/bin/bash
+    # main.sh
+
+    source lib1.sh
+    source lib2.sh
+
+    func1
+执行主脚本main.sh，会得到下面的结果。
+
+    $ ./main.sh
+    func1: BASH_SOURCE0 is lib1.sh
+    func1: BASH_SOURCE1 is ./main.sh
+    func1: BASH_SOURCE2 is
+    func2: BASH_SOURCE0 is lib2.sh
+    func2: BASH_SOURCE1 is lib1.sh
+    func2: BASH_SOURCE2 is ./main.sh
+上面例子中，执行函数func1时，变量BASH_SOURCE的0号成员是func1所在的脚本lib1.sh，1号成员是主脚本main.sh；执行函数func2时，变量BASH_SOURCE的0号成员是func2所在的脚本lib2.sh，1号成员是调用func2的脚本lib1.sh。
+
+#### 14.3.4 BASH_LINENO
+
+变量BASH_LINENO返回一个数组，内容是每一轮调用对应的行号。${BASH_LINENO[$i]}跟${FUNCNAME[$i]}是一一对应关系，表示${FUNCNAME[$i]}在调用它的脚本文件${BASH_SOURCE[$i+1]}里面的行号。
+
+下面有两个子脚本lib1.sh和lib2.sh。
+
+    # lib1.sh
+    function func1()
+    {
+      echo "func1: BASH_LINENO is ${BASH_LINENO[0]}"
+      echo "func1: FUNCNAME is ${FUNCNAME[0]}"
+      echo "func1: BASH_SOURCE is ${BASH_SOURCE[1]}"
+
+      func2
+    }
+    # lib2.sh
+    function func2()
+    {
+      echo "func2: BASH_LINENO is ${BASH_LINENO[0]}"
+      echo "func2: FUNCNAME is ${FUNCNAME[0]}"
+      echo "func2: BASH_SOURCE is ${BASH_SOURCE[1]}"
+    }
+然后，主脚本main.sh调用上面两个子脚本。
+
+    #!/bin/bash
+    # main.sh
+
+    source lib1.sh
+    source lib2.sh
+
+    func1
+执行主脚本main.sh，会得到下面的结果。
+
+    $ ./main.sh
+    func1: BASH_LINENO is 7
+    func1: FUNCNAME is func1
+    func1: BASH_SOURCE is main.sh
+    func2: BASH_LINENO is 8
+    func2: FUNCNAME is func2
+    func2: BASH_SOURCE is lib1.sh
+上面例子中，函数func1是在main.sh的第7行调用，函数func2是在lib1.sh的第8行调用的。
 
 ## 15 mktemp & trap
+### 15.1 安全问题
+直接创建临时文件，尤其在/tmp目录里面，往往会导致安全问题。
+
+首先，/tmp目录是所有人可读写的，任何用户都可以往该目录里面写文件。创建的临时文件也是所有人可读的。
+
+    $ touch /tmp/info.txt
+    $ ls -l /tmp/info.txt
+    -rw-r--r-- 1 ruanyf ruanyf 0 12月 28 17:12 /tmp/info.txt
+上面命令在/tmp目录直接创建文件，该文件默认是所有人可读的。
+生成临时文件应该遵循下面的规则。
+
++ 创建前检查文件是否已经存在。
++ 确保临时文件已成功创建。
++ 临时文件必须有权限的限制。
++ 临时文件要使用不可预测的文件名。
++ 脚本退出时，要删除临时文件（使用trap命令）。
+
+### 15.2 mktemp指令
+mktemp命令就是为安全创建临时文件而设计的。虽然在创建临时文件之前，它不会检查临时文件是否存在，但是它支持唯一文件名和清除机制，因此可以减轻安全攻击的风险。
+
+直接运行mktemp命令，就能生成一个临时文件。
+
+$ mktemp
+/tmp/tmp.4GcsWSG4vj
+
+$ ls -l /tmp/tmp.4GcsWSG4vj
+-rw------- 1 ruanyf ruanyf 0 12月 28 12:49 /tmp/tmp.4GcsWSG4vj
+上面命令中，mktemp命令生成的临时文件名是随机的，而且权限是只有用户本人可读写。
+
+Bash 脚本使用mktemp命令的用法如下。
+
+    #!/bin/bash
+
+    TMPFILE=$(mktemp)
+    echo "Our temp file is $TMPFILE"
+为了确保临时文件创建成功，mktemp命令后面最好使用 OR 运算符（||），保证创建失败时退出脚本。
+
+    #!/bin/bash
+
+    TMPFILE=$(mktemp) || exit 1
+    echo "Our temp file is $TMPFILE"
+为了保证脚本退出时临时文件被删除，可以使用trap命令指定退出时的清除操作。
+
+    #!/bin/bash
+
+    trap 'rm -f "$TMPFILE"' EXIT
+
+    TMPFILE=$(mktemp) || exit 1
+    echo "Our temp file is $TMPFILE"
+
+对应参数：
+-d参数可以创建一个临时目录。
+
+    $ mktemp -d
+    /tmp/tmp.Wcau5UjmN6
+-p参数可以指定临时文件所在的目录。默认是使用$TMPDIR环境变量指定的目录，如果这个变量没设置，那么使用/tmp目录。
+
+    $ mktemp -p /home/ruanyf/
+    /home/ruanyf/tmp.FOKEtvs2H3
+-t参数可以指定临时文件的文件名模板，模板的末尾必须至少包含三个连续的X字符，表示随机字符，建议至少使用六个X。默认的文件名模板是tmp.后接十个随机字符。
+
+    $ mktemp -t mytemp.XXXXXXX
+    /tmp/mytemp.yZ1HgZV
+
+### 15.3 trap
+trap命令用来在 Bash 脚本中响应系统信号。
+
+最常见的系统信号就是 SIGINT（中断），即按 Ctrl + C 所产生的信号。trap命令的-l参数，可以列出所有的系统信号。
+
+“动作”是一个 Bash 命令，“信号”常用的有以下几个。
+
++ HUP：编号1，脚本与所在的终端脱离联系。
++ INT：编号2，用户按下 Ctrl + C，意图让脚本中止运行。
++ QUIT：编号3，用户按下 Ctrl + 斜杠，意图退出脚本。
++ KILL：编号9，该信号用于杀死进程。
++ TERM：编号15，这是kill命令发出的默认信号。
++ EXIT：编号0，这不是系统信号，而是 Bash 脚本特有的信号，不管什么情况，只要退出脚本就会产生。
+trap命令响应EXIT信号的写法如下。
+
+    $ trap 'rm -f "$TMPFILE"' EXIT
+上面命令中，脚本遇到EXIT信号时，就会执行rm -f "$TMPFILE"。
+
+trap 命令的常见使用场景，就是在 Bash 脚本中指定退出时执行的清理命令。
+
+    #!/bin/bash
+
+    trap 'rm -f "$TMPFILE"' EXIT
+
+    TMPFILE=$(mktemp) || exit 1
+    ls /etc > $TMPFILE
+    if grep -qi "kernel" $TMPFILE; then
+      echo 'find'
+    fi
+上面代码中，不管是脚本正常执行结束，还是用户按 Ctrl + C 终止，都会产生EXIT信号，从而触发删除临时文件。
+
+注意，trap命令必须放在脚本的开头。否则，它上方的任何命令导致脚本退出，都不会被它捕获。
+
+如果trap需要触发多条命令，可以封装一个 Bash 函数。
+
+    function egress {
+      command1
+      command2
+      command3
+    }
+
+    trap egress EXIT
 
 ## 16 启动环境
 ### 16.1 session
